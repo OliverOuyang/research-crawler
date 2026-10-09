@@ -1,12 +1,13 @@
 ---
 name: staged-market-scrape
-description: 分阶段、低成本地用 Tavily + Apify 抓取 Reddit、TikTok、Google Trends 等平台的数据和评论做市场调研，每阶段先验证搜索相关性和数据质量再放量。
+description: 用 Tavily 找、Apify 抓 Reddit/TikTok/Google Trends 等数据和评论做市场调研；分阶段小样本验证质量再放量，每阶段交付 md 报告。
 ---
 
 # 分阶段市场数据抓取（Tavily 找 + Apify 抓）
 
 适用：产品前市场调研、竞品和用户痛点收集、需要从 Reddit / TikTok / Google Trends（以及 YouTube、Instagram、X、Amazon 评论等）拿数据和评论时。
-核心原则：**先找后抓，小样本验证，逐级放量。** 每一阶段有预算上限和通过标准，不达标就停下来修，绝不一次花掉大额 API。
+核心原则：**先找后抓，小样本验证，逐级放量。** 每一阶段有预算上限和通过标准，不达标就停下来修，绝不一次花掉大额 API。每阶段都交付一份 md 报告（概况、数据质量、如何使用、待思考问题），不只给数据。
+源码与更新：github.com/OliverOuyang/research-crawler（skills/staged-market-scrape、scripts/apify_stage.py、docs/）。
 
 ## 0. 准备（不花钱）
 
@@ -44,7 +45,7 @@ description: 分阶段、低成本地用 Tavily + Apify 抓取 Reddit、TikTok�
 
 - **Reddit：不要用 Actor 的全站关键词搜索**，即使开 strictSearch 也会混入大量不相关热帖（实测 “note taking app” 返回 r/AmItheAsshole）。正确做法：先用 Tavily `/search`（`include_domains: ["reddit.com"]`，basic 深度省 credit）找帖子 URL，筛出含 `/comments/` 的链接，人工或用正则确认相关，再把 URL 列表交给 Actor 抓帖子 + 评论。也可以指定 subreddit。
 - **TikTok：** 关键词搜索本身相关性好，但返回条数可能只有请求的一半，靠多关键词补量；评论用单独的评论 Actor，按视频 URL 串联，先挑互动高的视频。
-- **Google Trends：** 一个关键词一条记录、包含整条曲线，成本可忽略；同一次请求里比较关键词，不要拼接多次请求的数值；剔除 `isPartial=true` 的最后一个点。
+- **Google Trends：** 一个关键词一条记录、包含整条曲线，成本可忽略；同一次请求里比较关键词，不要拼接多次请求的数值；剔除 `timeline_data.isPartial` 为 true 的点。
 - Tavily `/extract` 可以直接抽 Reddit 帖子正文和首屏评论做纯定性分析（无点赞数），在不需要量化时比 Actor 更省。
 
 ## 4. 已验证 Actor（2026-10 实测/商店数据，价格按 Free 档）
@@ -56,19 +57,55 @@ description: 分阶段、低成本地用 Tavily + Apify 抓取 Reddit、TikTok�
 | TikTok 视频（关键词/话题） | apidojo/tiktok-scraper | $0.30/千条 | 输入 `keywords`、`maxItems`；返回可能少于请求数；字段 views/likes/comments/shares/bookmarks |
 | TikTok 视频（更稳） | clockworks/tiktok-scraper | $3.70/千条 | 成功率 99% |
 | TikTok 评论 | clockworks/tiktok-comments-scraper | $1.25/千条 | 输入 `postURLs`、`commentsPerPost`；有 diggCount、replyCommentTotal；会混广告评论 |
-| Google Trends 曲线 | data_xplorer/google-trends-fast-scraper | $2/千条 | `mode: keyword`、`keyword`、`predefinedTimeframe`、`geo`；输出 timeline_data、isPartial |
+| Google Trends 曲线 | data_xplorer/google-trends-fast-scraper | $2/千条 | `mode: keyword`、`keyword`、`predefinedTimeframe`、`geo`；输出 timeline_data（内含 isPartial） |
 
 价格和成功率会变，正式用前用 `find` 复核一次。
 
 ## 5. 数据留档与输出
 
-- 每次 run 保存原始 JSON（会话临时目录）和**去掉用户名/头像**的精简版（项目共享目录，如 `research/<主题>/<阶段>/`）。每条记录带 `source`、`fetched_at`、`query`/URL。
+- 每次 run 保存原始 JSON（会话临时目录）和**去掉用户名/头像**的精简版（项目共享目录，如 `research/<主题>/data/<阶段>/`）。每条记录带 `source`、`fetched_at`、`query`/URL。
 - 每阶段一张小表：来源、请求条数、实际条数、相关率、剔除比例、花费、是否过闸、下一步。
-- 最终报告写明数据窗口、样本量、来源分布（任一来源 ≤ 50%）、人群偏差，每个关键结论至少两个独立来源支撑（如 Reddit 痛点 + Trends 上升）。
 
-## 6. 不要做
+## 6. 每次抓完必须交付一份 md 报告（不能只给数据）
 
-- 不要跳过 S1/S2 直接大批量；不要不带 `maxTotalChargeUsd` 跑。
+每个阶段结束（S1 也要，篇幅可以短）都在 `research/<主题>/报告_<阶段>_<日期>.md` 写一份报告，交给用户时附上这份文件。报告给人看、帮助进一步思考，结构固定如下：
+
+```markdown
+# <主题> 数据抓取报告（<阶段>，<日期>）
+
+## 一句话结论
+这批数据能不能用、能回答什么问题、下一步建议（继续放量 / 换找法 / 停）。
+
+## 1. 抓了什么（明细概况）
+| 来源 | 找法（Tavily 查询 / 关键词 / URL） | Actor | 请求条数 | 实际条数 | 时间窗口 | 花费 |
+- 数据都在哪：文件路径 + 每个文件一句话说明。
+- 样本长什么样：每个来源 2–3 条代表性原文（截短，去用户名）。
+
+## 2. 数据质量
+| 检查项 | 结果 | 是否达标 |
+（条数完整率、关键字段缺失率、相关率、重复率、已删除/广告/外链剔除比例、指标成熟度如帖子是否满 72 小时、单价偏差）
+- 已知偏差：谁在说话（平台人群）、来源是否过于集中、时间段缺口。
+- 不能用来下结论的部分，明确列出。
+
+## 3. 初步发现（只写数据直接支撑的）
+- 3–7 条，每条带数字或原话引用和来源；推断要标“推断”。
+- Trends：曲线形状、峰值时间、季节性；注明是 0–100 相对值。
+
+## 4. 如何使用这批数据
+- 字段说明：每个文件的关键字段及含义（如 score=抓取时点赞数，isPartial=未完结周期）。
+- 适合做什么：痛点归纳、竞品提及统计、需求趋势……；不适合做什么：市场规模估算、跨请求比较 Trends 数值……
+- 怎么加载：一段最短的 Python 读取示例。
+
+## 5. 待思考的问题与下一步
+- 这批数据引出的开放问题（3–5 个），供用户判断方向。
+- 下一阶段计划：规模、预估花费、要改的找法或过滤规则。
+```
+
+报告写完自查：每个数字都能在数据文件里找到；没有把点赞数当需求规模；花费与 `whoami` 前后差额一致。
+
+## 7. 不要做
+
+- 不要只交数据不交报告；不要跳过 S1/S2 直接大批量；不要不带 `maxTotalChargeUsd` 跑。
 - 不要只看 HTTP 状态码或“run SUCCEEDED”判断成功，要看条数、字段和相关性。
 - 不要用点赞数直接当需求规模；Reddit 帖子发布不足 72 小时的互动数不要用。不要把 TikTok 播放量当购买意愿。
 - 不要绕过登录墙、签名或验证码；不要用个人账号 cookie；不要保存展示已删除内容；只留调研必需字段，用户名哈希或删除。

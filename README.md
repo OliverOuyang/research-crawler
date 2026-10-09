@@ -32,7 +32,7 @@ python scripts/apify_stage.py check out.json --expect 20 --fields id,likes --tex
 
 ## Skill（skills/）
 
-[staged-market-scrape](skills/staged-market-scrape/SKILL.md)：Tavily 找 + Apify 抓、分阶段小样本验证再放量的通用流程，可直接装成 Claude Skill 在其他项目复用。
+[staged-market-scrape](skills/staged-market-scrape/SKILL.md)：Tavily 找 + Apify 抓、分阶段小样本验证再放量的通用流程，每阶段交付一份 md 报告（[示例](skills/staged-market-scrape/examples/报告_S1冒烟_2026-10-09.md)），可直接装成 Claude Skill 在其他项目复用。
 
 搜索结果按日期存到 `data/raw/tavily/`（已被 .gitignore 排除）。
 
