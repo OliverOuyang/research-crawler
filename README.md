@@ -20,6 +20,20 @@ python scripts/check_apis.py     # 检查 Tavily、MiniMax 是否可用（不打
 python scripts/tavily_search.py "关键词" --depth basic --max 8 --domain reddit.com
 ```
 
+分阶段用 Apify 抓数据（需要环境变量 `APIFY_TOKEN`，或由代理为 api.apify.com 注入）：
+
+```bash
+python scripts/apify_stage.py whoami                        # 套餐、本月已用金额
+python scripts/apify_stage.py find "tiktok scraper"         # 商店里比价格、成功率
+python scripts/apify_stage.py schema apidojo~tiktok-scraper # 看输入参数
+python scripts/apify_stage.py run <actor> input.json out.json --max-usd 0.2
+python scripts/apify_stage.py check out.json --expect 20 --fields id,likes --text-field title --must "note|app"
+```
+
+## Skill（skills/）
+
+[staged-market-scrape](skills/staged-market-scrape/SKILL.md)：Tavily 找 + Apify 抓、分阶段小样本验证再放量的通用流程，可直接装成 Claude Skill 在其他项目复用。
+
 搜索结果按日期存到 `data/raw/tavily/`（已被 .gitignore 排除）。
 
 ## 密钥
