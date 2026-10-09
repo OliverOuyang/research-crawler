@@ -6,7 +6,7 @@ description: 用 Tavily 找、Apify 抓 Reddit/TikTok/Trends/YouTube/应用商�
 # 分阶段市场数据抓取（Tavily 找 + Apify 抓）
 
 适用：产品前市场调研、竞品和用户痛点收集、需要从 Reddit / TikTok / Google Trends（以及 YouTube、Instagram、X、Amazon 评论等）拿数据和评论时。
-核心原则：**先找后抓，小样本验证，逐级放量。** 每一阶段有预算上限和通过标准，不达标就停下来修，绝不一次花掉大额 API。每阶段都交付一份 md 报告（概况、数据质量、如何使用、待思考问题），不只给数据。
+核心原则：**先找后抓，小样本验证，逐级放量。** 每一阶段有预算上限和通过标准，不达标就停下来修，绝不一次花掉大额 API。每阶段都交付一份 md 报告（概况、数据质量、前五条明细和字段含义、待思考问题），不只给数据。
 源码与更新：github.com/OliverOuyang/research-crawler（skills/staged-market-scrape、scripts/apify_stage.py、docs/）。
 
 ## 0. 准备（不花钱）
@@ -114,7 +114,7 @@ description: 用 Tavily 找、Apify 抓 Reddit/TikTok/Trends/YouTube/应用商�
 
 S3 正式报告还要写明：来源分布（任一来源 ≤ 50%），且每个关键结论至少有两个独立来源支撑（如 Reddit 痛点 + Trends 上升）。
 
-报告写完自查：每个数字都能在数据文件里找到；没有把点赞数当需求规模；花费与 `whoami` 前后差额一致。
+报告写完自查：每个数字都能在数据文件里找到；引用的原话逐字核对过（截短要用省略号，不能改写）；没有把点赞数当需求规模；花费与 `whoami` 前后差额一致。
 
 ## 7. 不要做
 
