@@ -1,0 +1,16 @@
+# 密钥：任何含 key 的文件都不要提交
+.env
+.env.*
+!.env.example
+config/*.local.*
+*.key
+*secret*
+*credential*
+
+# 采集数据和缓存
+data/raw/
+data/cache/
+*.sqlite
+__pycache__/
+.venv/
+.DS_Store
