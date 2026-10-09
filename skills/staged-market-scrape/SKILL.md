@@ -1,6 +1,6 @@
 ---
 name: staged-market-scrape
-description: 用 Tavily 找、Apify 抓 Reddit/TikTok/Google Trends 等数据和评论做市场调研；分阶段小样本验证质量再放量，每阶段交付 md 报告。
+description: 用 Tavily 找、Apify 抓 Reddit/TikTok/Trends/YouTube/应用商店/X/Trustpilot 等数据和评论做市场调研；分阶段小样本验证质量再放量，每阶段交付 md 报告。
 ---
 
 # 分阶段市场数据抓取（Tavily 找 + Apify 抓）
@@ -13,7 +13,7 @@ description: 用 Tavily 找、Apify 抓 Reddit/TikTok/Google Trends 等数据和
 
 1. 确认凭证：Tavily 和 Apify 的 key 由环境注入（`APIFY_TOKEN` / `TAVILY_API_KEY` 环境变量，或代理为 api.apify.com、api.tavily.com 注入 Authorization）。**不要把 key 写进文件、命令输出或聊天。** 缺了就告诉用户去环境里加，不要让用户把 key 贴进聊天。
 2. 把下面的 helper 存成会话临时目录里的 `apify_stage.py`（只用标准库）。
-3. `python3 apify_stage.py whoami`：看套餐、本月已用金额和上限。把剩余额度当作总预算。
+3. `python3 apify_stage.py whoami`：看套餐、本月已用金额和上限。把剩余额度当作总预算。**Apify 免费档下，多数付费 Actor 每次最多返回 10 条**（run 的 status message 会提示 “subscribe to a paid plan”），有的 Actor 直接拒绝免费用户（如 Amazon 评论）。S1 用免费档够了；S2 起建议升级 Starter，或把输入拆成多个小批次。
 4. 跟用户确认（或按合理默认）调研问题：目标用户、品类、竞品、语言/地区、时间窗口。把它写成 3–8 个英文关键词 + 1 组“相关性正则”（例如 `note|notion|obsidian|goodnotes`），后面每阶段都用它测相关性。
 
 ## 1. 选 Actor（不花钱）
@@ -32,7 +32,7 @@ description: 用 Tavily 找、Apify 抓 Reddit/TikTok/Google Trends 等数据和
 | S3 正式 | 达到样本量目标（定性 ≥ 200 有效条，比例结论 ≥ 400） | 按 S2 实际单价 × 1.3 | 出结论用 |
 | S4 补充 | 只补缺口（某来源不足、某时间段缺失） | 按需 | 不重跑全量 |
 
-每次 run 都带 `maxTotalChargeUsd`（helper 的 `--max-usd`）。**下一阶段开始前，必须向用户报告上一阶段的结果和下一阶段的预估花费**；用户明确说过“自动跑完”才可连续执行。
+每次 run 都带 `maxTotalChargeUsd`（helper 的 `--max-usd`）。部分 Actor 要求上限不低于某个值（实测 $0.45–$1），helper 会打印报错，按提示调高即可；它只是上限，实际按条计费。**下一阶段开始前，必须向用户报告上一阶段的结果和下一阶段的预估花费**；用户明确说过“自动跑完”才可连续执行。
 
 ### 闸门：每阶段跑完用 `apify_stage.py check` 检查，全部达标才放量
 - 条数 ≥ 请求的 90%（否则记“部分失败”，查原因：分页、关键词太窄、Actor 单次上限）。
@@ -44,8 +44,13 @@ description: 用 Tavily 找、Apify 抓 Reddit/TikTok/Google Trends 等数据和
 ## 3. “找”和“抓”的分工（实测得出）
 
 - **Reddit：不要用 Actor 的全站关键词搜索**，即使开 strictSearch 也会混入大量不相关热帖（实测 “note taking app” 返回 r/AmItheAsshole）。正确做法：先用 Tavily `/search`（`include_domains: ["reddit.com"]`，basic 深度省 credit）找帖子 URL，筛出含 `/comments/` 的链接，人工或用正则确认相关，再把 URL 列表交给 Actor 抓帖子 + 评论。也可以指定 subreddit。
-- **TikTok：** 关键词搜索本身相关性好，但返回条数可能只有请求的一半，靠多关键词补量；评论用单独的评论 Actor，按视频 URL 串联，先挑互动高的视频。
+- **TikTok：** 关键词搜索本身相关性好；评论用单独的评论 Actor，按视频 URL 串联，先挑互动高的视频。
 - **Google Trends：** 一个关键词一条记录、包含整条曲线，成本可忽略；同一次请求里比较关键词，不要拼接多次请求的数值；剔除 `timeline_data.isPartial` 为 true 的点。
+- **应用商店评论（App Store / Google Play）：** 按 App ID 抓，最便宜（约 $0.1/千条）。App Store 评论更长更具体；Google Play 大量“nice app”短评，要按 `HELPFULNESS` 排序或只取 1–3 星。
+- **YouTube：** 先搜视频（加 `dateFilter` 控制时效），再挑评测/对比类视频抓热门评论；热门评论很多是玩笑，要按关键词筛，剔除 `authorIsChannelOwner=true` 的推广。
+- **X：** 不加过滤会混入大量外语赠送和账号转卖。查询要带 `lang:en -filter:links` 和意图词，如 `<产品> (annoying OR wish OR bug OR switched OR hate)`。
+- **Trustpilot：** 按 `source` 分开看，`BasicLink` 是商家邀请的评价，偏正面；`Organic` 偏负面。
+- **Quora：** 搜索只给问题标题和回答数，且多为老问题，价值低；**Amazon 评论**抓取器免费档不可用。
 - Tavily `/extract` 可以直接抽 Reddit 帖子正文和首屏评论做纯定性分析（无点赞数），在不需要量化时比 Actor 更省。
 
 ## 4. 已验证 Actor（2026-10 实测/商店数据，价格按 Free 档）
@@ -53,10 +58,16 @@ description: 用 Tavily 找、Apify 抓 Reddit/TikTok/Google Trends 等数据和
 | 用途 | Actor | 价格 | 注意 |
 |---|---|---|---|
 | Reddit 帖子+评论（按 URL） | fatihtahta/reddit-scraper-search-fast | $1.49/千条 | 输入 `urls`、`scrapeComments`、`maxComments`（**每帖**上限）；有 score、num_comments、created_utc、is_deleted_or_removed |
-| Reddit 评论多时更省 | automation-lab/reddit-scraper | 帖 $1.15/千、评论 $0.575/千 | 需先 S1 冒烟 |
-| TikTok 视频（关键词/话题） | apidojo/tiktok-scraper | $0.30/千条 | 输入 `keywords`、`maxItems`；返回可能少于请求数；字段 views/likes/comments/shares/bookmarks |
+| Reddit 评论多时更省 | automation-lab/reddit-scraper | 帖 $1.15/千、评论 $0.575/千 | 未实测，先 S1 冒烟 |
+| TikTok 视频（关键词/话题） | apidojo/tiktok-scraper | $0.30/千条 | 输入 `keywords`、`maxItems`；免费档每次最多 10 条；字段 views/likes/comments/shares/bookmarks |
 | TikTok 视频（更稳） | clockworks/tiktok-scraper | $3.70/千条 | 成功率 99% |
 | TikTok 评论 | clockworks/tiktok-comments-scraper | $1.25/千条 | 输入 `postURLs`、`commentsPerPost`；有 diggCount、replyCommentTotal；会混广告评论 |
+| YouTube 视频 | streamers/youtube-scraper | $4/千条 | `searchQueries`、`maxResults`、`dateFilter`；viewCount、likes、commentsCount、date |
+| YouTube 评论 | streamers/youtube-comments-scraper | $2/千条 | `startUrls`、`maxComments`、`sortCommentsBy: TOP_COMMENTS`；最低上限 $0.5；voteCount、replyCount、相对时间 |
+| App Store 评论 | thewolves/appstore-reviews-scraper | $0.1/千条 | `appIds`（数字 ID）、`country`、`maxItems`；score、title、text、version |
+| Google Play 评论 | theagents/googleplay-reviews | $0.1/千条 | `appIds`（包名）、`sort`、`maxItems`；score、thumbsUp、text、version |
+| X 推文 | apidojo/twitter-scraper-lite | 每次查询 $0.016 + $0.4/千条起 | `searchTerms`（支持高级搜索语法）、`sort`、`maxItems` |
+| Trustpilot 评价 | memo23/trustpilot-scraper-ppe | $0.75/千条 + $0.05/次 | `startUrls`（域名）；最低上限 $0.45；rating、text、source、experiencedDate |
 | Google Trends 曲线 | data_xplorer/google-trends-fast-scraper | $2/千条 | `mode: keyword`、`keyword`、`predefinedTimeframe`、`geo`；输出 timeline_data（内含 isPartial） |
 
 价格和成功率会变，正式用前用 `find` 复核一次。
@@ -91,10 +102,10 @@ description: 用 Tavily 找、Apify 抓 Reddit/TikTok/Google Trends 等数据和
 - 3–7 条，每条带数字或原话引用和来源；推断要标“推断”。
 - Trends：曲线形状、峰值时间、季节性；注明是 0–100 相对值。
 
-## 4. 如何使用这批数据
-- 字段说明：每个文件的关键字段及含义（如 score=抓取时点赞数，isPartial=未完结周期）。
-- 适合做什么：痛点归纳、竞品提及统计、需求趋势……；不适合做什么：市场规模估算、跨请求比较 Trends 数值……
-- 怎么加载：一段最短的 Python 读取示例。
+## 4. 数据明细（每个来源前五条）与字段含义
+- 每个来源一张表，列出前五条记录的关键字段（正文截短到约 90 字，去用户名）。
+- 字段含义表：文件 | 字段 | 含义（如 score=抓取时点赞数，isPartial=未完结周期，source=BasicLink 表示商家邀请）。
+- 一句话说明适合做什么（痛点归纳、竞品提及统计、需求趋势）和不适合做什么（市场规模估算、跨请求比较 Trends 数值）。
 
 ## 5. 待思考的问题与下一步
 - 这批数据引出的开放问题（3–5 个），供用户判断方向。
@@ -126,7 +137,7 @@ Usage:
   apify_stage.py check <out.json> --expect N --fields a,b,c [--text-field title] [--must "kw1|kw2"]
 Token: env APIFY_TOKEN, or none if a proxy injects Authorization for api.apify.com.
 """
-import json, os, re, sys, urllib.request, urllib.parse, collections, time
+import json, os, re, sys, time, urllib.error, urllib.parse, urllib.request
 
 API = "https://api.apify.com/v2"
 
@@ -136,8 +147,12 @@ def req(path, data=None, timeout=330):
         h["Authorization"] = "Bearer " + os.environ["APIFY_TOKEN"]
     r = urllib.request.Request(API + path, data=json.dumps(data).encode() if data is not None else None,
                                headers=h, method="POST" if data is not None else "GET")
-    with urllib.request.urlopen(r, timeout=timeout) as f:
-        return json.loads(f.read() or b"null")
+    try:
+        with urllib.request.urlopen(r, timeout=timeout) as f:
+            return json.loads(f.read() or b"null")
+    except urllib.error.HTTPError as e:
+        body = e.read().decode(errors="replace")[:500]
+        sys.exit(f"HTTP {e.code} on {path.split('?')[0]}: {body}")
 
 def whoami():
     me = req("/users/me")["data"]; lim = req("/users/me/limits")["data"]
@@ -164,11 +179,17 @@ def schema(actor):
               f'{("enum=" + str(v["enum"])[:70]) if "enum" in v else ""}')
 
 def run(actor, inp, out, max_usd):
+    """Start async, wait, then fetch items; prints cost and the run's status message."""
     t = time.time()
-    data = req(f"/acts/{actor}/run-sync-get-dataset-items?timeout=300&maxTotalChargeUsd={max_usd}",
-               json.load(open(inp)))
+    r = req(f"/acts/{actor}/runs?maxTotalChargeUsd={max_usd}", json.load(open(inp)))["data"]
+    while r["status"] in ("READY", "RUNNING"):
+        r = req(f"/actor-runs/{r['id']}?waitForFinish=60")["data"]
+    data = req(f"/datasets/{r['defaultDatasetId']}/items?clean=true&format=json")
     json.dump(data, open(out, "w"), ensure_ascii=False, indent=1)
-    print(f"{actor}: {len(data)} items in {time.time()-t:.0f}s -> {out}")
+    print(f"{actor}: {r['status']} | {len(data)} items in {time.time()-t:.0f}s | "
+          f"cost ${r.get('usageTotalUsd') or 0:.3f} | events {r.get('chargedEventCounts')} -> {out}")
+    if r.get("statusMessage"):
+        print("  status message:", r["statusMessage"][:200])
 
 def check(out, expect, fields, text_field=None, must=None):
     d = json.load(open(out)); n = len(d)

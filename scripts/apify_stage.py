@@ -8,7 +8,7 @@ Usage:
   apify_stage.py check <out.json> --expect N --fields a,b,c [--text-field title] [--must "kw1|kw2"]
 Token: env APIFY_TOKEN, or none if a proxy injects Authorization for api.apify.com.
 """
-import json, os, re, sys, urllib.request, urllib.parse, collections, time
+import json, os, re, sys, time, urllib.error, urllib.parse, urllib.request
 
 try:  # repo: read .env if present
     from _env import load_env; load_env()
@@ -23,8 +23,12 @@ def req(path, data=None, timeout=330):
         h["Authorization"] = "Bearer " + os.environ["APIFY_TOKEN"]
     r = urllib.request.Request(API + path, data=json.dumps(data).encode() if data is not None else None,
                                headers=h, method="POST" if data is not None else "GET")
-    with urllib.request.urlopen(r, timeout=timeout) as f:
-        return json.loads(f.read() or b"null")
+    try:
+        with urllib.request.urlopen(r, timeout=timeout) as f:
+            return json.loads(f.read() or b"null")
+    except urllib.error.HTTPError as e:
+        body = e.read().decode(errors="replace")[:500]
+        sys.exit(f"HTTP {e.code} on {path.split('?')[0]}: {body}")
 
 def whoami():
     me = req("/users/me")["data"]; lim = req("/users/me/limits")["data"]
@@ -51,11 +55,17 @@ def schema(actor):
               f'{("enum=" + str(v["enum"])[:70]) if "enum" in v else ""}')
 
 def run(actor, inp, out, max_usd):
+    """Start async, wait, then fetch items; prints cost and the run's status message."""
     t = time.time()
-    data = req(f"/acts/{actor}/run-sync-get-dataset-items?timeout=300&maxTotalChargeUsd={max_usd}",
-               json.load(open(inp)))
+    r = req(f"/acts/{actor}/runs?maxTotalChargeUsd={max_usd}", json.load(open(inp)))["data"]
+    while r["status"] in ("READY", "RUNNING"):
+        r = req(f"/actor-runs/{r['id']}?waitForFinish=60")["data"]
+    data = req(f"/datasets/{r['defaultDatasetId']}/items?clean=true&format=json")
     json.dump(data, open(out, "w"), ensure_ascii=False, indent=1)
-    print(f"{actor}: {len(data)} items in {time.time()-t:.0f}s -> {out}")
+    print(f"{actor}: {r['status']} | {len(data)} items in {time.time()-t:.0f}s | "
+          f"cost ${r.get('usageTotalUsd') or 0:.3f} | events {r.get('chargedEventCounts')} -> {out}")
+    if r.get("statusMessage"):
+        print("  status message:", r["statusMessage"][:200])
 
 def check(out, expect, fields, text_field=None, must=None):
     d = json.load(open(out)); n = len(d)
