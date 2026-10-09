@@ -13,7 +13,7 @@ description: 用 Tavily 找、Apify 抓 Reddit/TikTok/Trends/YouTube/应用商�
 
 1. 确认凭证：Tavily 和 Apify 的 key 由环境注入（`APIFY_TOKEN` / `TAVILY_API_KEY` 环境变量，或代理为 api.apify.com、api.tavily.com 注入 Authorization）。**不要把 key 写进文件、命令输出或聊天。** 缺了就告诉用户去环境里加，不要让用户把 key 贴进聊天。
 2. 把下面的 helper 存成会话临时目录里的 `apify_stage.py`（只用标准库）。
-3. `python3 apify_stage.py whoami`：看套餐、本月已用金额和上限。把剩余额度当作总预算。**Apify 免费档下，多数付费 Actor 每次最多返回 10 条**（run 的 status message 会提示 “subscribe to a paid plan”），有的 Actor 直接拒绝免费用户（如 Amazon 评论）。S1 用免费档够了；S2 起建议升级 Starter，或把输入拆成多个小批次。
+3. `python3 apify_stage.py whoami`：看套餐、本月已用金额和上限。把剩余额度当作总预算。**Apify 免费档下，多数付费 Actor 每次最多返回 10 条**（run 的 status message 会提示 “subscribe to a paid plan”），有的 Actor 直接拒绝免费用户（如 Amazon 评论）。**先换 Actor**：第 4 节标“首选”的 TikTok、App Store、Google Play、X Actor 免费档实测不封顶。确实只能用封顶的 Actor 时，才升级 Starter 或拆批（同一输入重复跑只会拿回同一批，拆批要换关键词、时间窗、排序或 URL 分组，并按 id 去重）。
 4. 跟用户确认（或按合理默认）调研问题：目标用户、品类、竞品、语言/地区、时间窗口。把它写成 3–8 个英文关键词 + 1 组“相关性正则”（例如 `note|notion|obsidian|goodnotes`），后面每阶段都用它测相关性。
 
 ## 1. 选 Actor（不花钱）
@@ -59,14 +59,17 @@ description: 用 Tavily 找、Apify 抓 Reddit/TikTok/Trends/YouTube/应用商�
 |---|---|---|---|
 | Reddit 帖子+评论（按 URL） | fatihtahta/reddit-scraper-search-fast | $1.49/千条 | 输入 `urls`、`scrapeComments`、`maxComments`（**每帖**上限）；有 score、num_comments、created_utc、is_deleted_or_removed |
 | Reddit 评论多时更省 | automation-lab/reddit-scraper | 帖 $1.15/千、评论 $0.575/千 | 未实测，先 S1 冒烟 |
-| TikTok 视频（关键词/话题） | apidojo/tiktok-scraper | $0.30/千条 | 输入 `keywords`、`maxItems`；免费档每次最多 10 条；字段 views/likes/comments/shares/bookmarks |
-| TikTok 视频（更稳） | clockworks/tiktok-scraper | $3.70/千条 | 成功率 99% |
+| TikTok 视频（首选） | clockworks/tiktok-scraper | $3.70/千条 | `searchQueries`、`resultsPerPage`、`searchSection: /video`；**免费档实测 25/25 不封顶**；最低上限 $0.5；playCount、diggCount、collectCount、createTimeISO |
+| TikTok 视频（付费档才用） | apidojo/tiktok-scraper | $0.30/千条 | 免费档每次最多 10 条，2026-10-09 复测返回 10 条 `noResults` 空行且照样计费 |
 | TikTok 评论 | clockworks/tiktok-comments-scraper | $1.25/千条 | 输入 `postURLs`、`commentsPerPost`；有 diggCount、replyCommentTotal；会混广告评论 |
 | YouTube 视频 | streamers/youtube-scraper | $4/千条 | `searchQueries`、`maxResults`、`dateFilter`；viewCount、likes、commentsCount、date |
 | YouTube 评论 | streamers/youtube-comments-scraper | $2/千条 | `startUrls`、`maxComments`、`sortCommentsBy: TOP_COMMENTS`；最低上限 $0.5；voteCount、replyCount、相对时间 |
-| App Store 评论 | thewolves/appstore-reviews-scraper | $0.1/千条 | `appIds`（数字 ID）、`country`、`maxItems`；score、title、text、version |
-| Google Play 评论 | theagents/googleplay-reviews | $0.1/千条 | `appIds`（包名）、`sort`、`maxItems`；score、thumbsUp、text、version |
-| X 推文 | apidojo/twitter-scraper-lite | 每次查询 $0.016 + $0.4/千条起 | `searchTerms`（支持高级搜索语法）、`sort`、`maxItems` |
+| App Store 评论（首选） | johnvc/apple-app-store-reviews-api | 按次计费，实测几乎为 0 | `product_ids`、`country`、`sort`（可 `mostcritical`）、`max_reviews`、`include_macos: false`；**免费档 25/25**；rating、review_title、review_text、review_date_iso、reviewed_version |
+| App Store 评论（付费档） | thewolves/appstore-reviews-scraper 或 theagents/appstore-reviews | $0.1/千条 | 免费档每次最多 10 条 |
+| Google Play 评论（首选） | neatrat/google-play-store-reviews-scraper | 实测几乎为 0 | `appIdOrUrl`（包名）、`sortBy: newest`、`maxReviews`、`pagesToScrape`、`reviewsPerPage`；**免费档 25/25**；rating、body、date、helpfulCounts、appVersion |
+| Google Play 评论（付费档） | theagents/googleplay-reviews | $0.1/千条 | 免费档每次最多 10 条 |
+| X 推文（首选） | kaitoeasyapi/twitter-x-data-tweet-scraper-pay-per-result-cheapest | 约 $0.25/千条 | `searchTerms`（高级搜索语法）、`queryType: Latest`、`maxItems`；**免费档不封顶**，但会超量返回且有重复（要 25 回 80 条、去重后 40），必须按 `id` 去重 |
+| X 推文（付费档） | apidojo/twitter-scraper-lite | 每次查询 $0.016 + $0.4/千条起 | 免费档每次最多 10 条 |
 | Trustpilot 评价 | memo23/trustpilot-scraper-ppe | $0.75/千条 + $0.05/次 | `startUrls`（域名）；最低上限 $0.45；rating、text、source、experiencedDate |
 | Google Trends 曲线 | data_xplorer/google-trends-fast-scraper | $2/千条 | `mode: keyword`、`keyword`、`predefinedTimeframe`、`geo`；输出 timeline_data（内含 isPartial） |
 
