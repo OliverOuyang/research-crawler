@@ -87,6 +87,7 @@ def download(url: str, provider: str, outdir: str) -> list[str]:
             "outtmpl": f"{outdir}/%(id)s_%(title).60B.%(ext)s",
             "format": "bv*+ba/b",
             "merge_output_format": "mp4",
+            "noprogress": True,
         },
     )
     try:

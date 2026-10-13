@@ -24,7 +24,7 @@ def note_id(url: str) -> str | None:
 def extract(url: str) -> MediaResult:
     client = Client("xiaohongshu", ua=DESKTOP_UA)
     final, html = client.get(url, headers={"Referer": "https://www.xiaohongshu.com/"})
-    if "/404" in final or "/website-login" in final:
+    if any(k in final for k in ("/404", "/website-login", "/login?")):
         raise ExtractError("小红书返回了 404/登录页：笔记不可见，或链接缺少 xsec_token（请用 App 分享链接），或需要在 cookies/xiaohongshu.txt 放登录态")
     nid = note_id(final) or note_id(url)
     state = find_json_assignment(html, ["__INITIAL_STATE__"])
