@@ -4,6 +4,11 @@
 """
 from __future__ import annotations
 
+import os
+import shutil
+import sys
+from pathlib import Path
+
 from ..http import cookie_file, proxy_for
 from ..models import ExtractError, MediaFile, MediaResult
 
@@ -16,6 +21,10 @@ def _ydl_opts(provider: str, extra: dict | None = None) -> dict:
     px = proxy_for(provider)
     if px:
         opts["proxy"] = px
+    # 没激活虚拟环境时 PATH 里可能没有 ffmpeg：也找一下解释器旁边的（VPS 上是 venv 里的软链）
+    ff = os.environ.get("MEDIADL_FFMPEG") or str(Path(sys.executable).with_name("ffmpeg"))
+    if not shutil.which("ffmpeg") and os.path.exists(ff):
+        opts["ffmpeg_location"] = ff
     opts.update(extra or {})
     return opts
 
@@ -67,8 +76,6 @@ def from_info(info: dict, provider: str, url: str = "") -> MediaResult:
 
 def download(url: str, provider: str, outdir: str) -> list[str]:
     """用 yt-dlp 直接下载到 outdir，返回新增的文件。B 站 DASH 音视频合并需要本机有 ffmpeg。"""
-    import os
-
     import yt_dlp
 
     os.makedirs(outdir, exist_ok=True)
