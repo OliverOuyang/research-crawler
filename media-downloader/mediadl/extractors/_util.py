@@ -6,7 +6,7 @@ from typing import Any, Iterator
 
 
 def find_json_assignment(html: str, var_names: list[str]) -> Any | None:
-    """从 <script>window.X = {...}</script> 里取出对象。兼容 undefined（小红书会出现）。"""
+    """从 <script>window.X = {...}</script> 里取出对象。兼容 undefined 和空的 new Map([])（小红书会出现）。"""
     for name in var_names:
         m = re.search(r"window\.%s\s*=\s*" % re.escape(name), html)
         if not m:
@@ -16,6 +16,8 @@ def find_json_assignment(html: str, var_names: list[str]) -> Any | None:
         if raw is None:
             continue
         raw = re.sub(r"(?<=[:\[,])\s*undefined\s*(?=[,}\]])", "null", raw)
+        # 登录态页面会混入 JS 构造器，如 "noteDetailMap":new Map([])
+        raw = re.sub(r"(?<=[:\[,])\s*new\s+(?:Map|Set)\(\[\]\)", "null", raw)
         try:
             return json.loads(raw)
         except json.JSONDecodeError:

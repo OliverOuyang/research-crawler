@@ -7,6 +7,7 @@ from __future__ import annotations
 import os
 import shutil
 import sys
+import tempfile
 from pathlib import Path
 
 from ..http import cookie_file, proxy_for
@@ -17,7 +18,7 @@ def _ydl_opts(provider: str, extra: dict | None = None) -> dict:
     opts = {"quiet": True, "no_warnings": True, "noplaylist": True, "skip_download": True}
     cf = cookie_file(provider)
     if cf:
-        opts["cookiefile"] = str(cf)
+        opts["cookiefile"] = _writable_copy(cf, provider)
     px = proxy_for(provider)
     if px:
         opts["proxy"] = px
@@ -27,6 +28,15 @@ def _ydl_opts(provider: str, extra: dict | None = None) -> dict:
         opts["ffmpeg_location"] = ff
     opts.update(extra or {})
     return opts
+
+
+def _writable_copy(cf: Path, provider: str) -> str:
+    """yt-dlp 结束时会把 cookies 写回 cookiefile；cookies 目录可能是只读挂载，所以给它一份私有副本。"""
+    dst = Path(tempfile.gettempdir()) / f"mediadl-cookies-{os.getpid()}-{provider}.txt"
+    fd = os.open(dst, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "wb") as f:
+        f.write(cf.read_bytes())
+    return str(dst)
 
 
 def extract(url: str, provider: str) -> MediaResult:
