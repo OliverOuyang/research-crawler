@@ -1,0 +1,2 @@
+# curl-cffi 让 yt-dlp 能模拟浏览器指纹，TikTok 需要它
+yt-dlp[default,curl-cffi]>=2026.8.19

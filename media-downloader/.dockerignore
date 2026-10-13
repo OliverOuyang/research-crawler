@@ -1,0 +1,6 @@
+.venv
+downloads
+cookies/*.txt
+docs
+tests
+__pycache__

@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>本地无水印下载</title>
+<style>
+:root{--bg:#f7f7f5;--card:#fff;--fg:#1d1d1f;--muted:#6e6e73;--line:#e3e3e0;--acc:#e8364f;--ok:#1a7f4b;--warn:#a15c00}
+@media (prefers-color-scheme:dark){:root{--bg:#141414;--card:#1e1e1e;--fg:#f2f2f2;--muted:#a0a0a0;--line:#333;--acc:#ff5a70;--ok:#4cc38a;--warn:#e0a040}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.6 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif}
+main{max-width:920px;margin:0 auto;padding:28px 16px 60px}
+h1{font-size:24px;margin:0 0 4px}p.sub{color:var(--muted);margin:0 0 18px}
+.box{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px}
+textarea{width:100%;min-height:90px;border:1px solid var(--line);border-radius:10px;padding:10px;font:inherit;background:transparent;color:inherit;resize:vertical}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+button{border:1px solid var(--line);background:var(--card);color:var(--fg);border-radius:9px;padding:7px 14px;font:inherit;cursor:pointer}
+button.primary{background:var(--acc);border-color:var(--acc);color:#fff}button:disabled{opacity:.5;cursor:default}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}.chip{font-size:12px;color:var(--muted);border:1px solid var(--line);border-radius:99px;padding:2px 9px}
+.item{margin-top:16px}.meta{display:grid;grid-template-columns:auto 1fr;gap:2px 12px;font-size:14px;margin:8px 0}
+.meta b{color:var(--muted);font-weight:500}.err{color:var(--acc);white-space:pre-wrap}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-top:10px}
+.cell{border:1px solid var(--line);border-radius:10px;overflow:hidden;position:relative;background:var(--bg)}
+.cell img,.cell video{width:100%;height:190px;object-fit:cover;display:block;background:#000}
+.cell .bar{display:flex;justify-content:space-between;align-items:center;padding:4px 6px;font-size:12px;color:var(--muted)}
+.cell input{position:absolute;top:6px;left:6px;width:18px;height:18px}
+.saved{font-size:13px;margin-top:8px}.saved a{color:var(--acc)}
+.tag{font-size:12px;padding:1px 7px;border-radius:6px;border:1px solid var(--line)}.tag.ok{color:var(--ok)}.tag.warn{color:var(--warn)}
+#recent{font-size:13px;color:var(--muted);margin-top:10px}#recent a{color:inherit;cursor:pointer;margin-right:10px}
+</style>
+</head>
+<body>
+<main>
+  <h1>本地无水印下载</h1>
+  <p class="sub">粘贴分享链接或整段分享文案，在本机解析并保存到 <code>media-downloader/downloads/</code>。只用于下载你有权保存的公开内容。</p>
+  <div class="box">
+    <textarea id="input" placeholder="例如：7.94 复制打开抖音，看看【xxx的作品】... https://v.douyin.com/xxxx/"></textarea>
+    <div class="row">
+      <button class="primary" id="go">解析</button>
+      <button id="paste">从剪贴板粘贴</button>
+      <button id="clear">清空</button>
+      <span id="status" style="color:var(--muted)"></span>
+    </div>
+    <div class="chips" id="chips"></div>
+    <div id="recent"></div>
+  </div>
+  <div id="out"></div>
+</main>
+<script>
+const $=s=>document.querySelector(s), esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const KIND={video:'视频',image:'图片',live:'Live 动图',cover:'封面',audio:'背景音频'};
+const WM={removed:['已去除','ok'],attempted:['尽力去除','warn'],present:['保留','warn'],unknown:['未知','']};
+fetch('/api/providers').then(r=>r.json()).then(p=>{$('#chips').innerHTML=Object.values(p).map(n=>`<span class="chip">${n}</span>`).join('')});
+function recent(){let r=[];try{r=JSON.parse(localStorage.getItem('mediadl_recent')||'[]')}catch{}return r}
+function pushRecent(e){try{const r=[e,...recent().filter(x=>x.url!==e.url)].slice(0,8);localStorage.setItem('mediadl_recent',JSON.stringify(r))}catch{}drawRecent()}
+function drawRecent(){const r=recent();$('#recent').innerHTML=r.length?'最近：'+r.map((x,i)=>`<a data-i="${i}">${esc(x.label)}</a>`).join(''):'';
+  $('#recent').querySelectorAll('a').forEach(a=>a.onclick=()=>{$('#input').value=recent()[a.dataset.i].url;go()})}
+drawRecent();
+$('#paste').onclick=async()=>{try{$('#input').value=await navigator.clipboard.readText()}catch{$('#status').textContent='浏览器不允许读剪贴板，请手动粘贴'}};
+$('#clear').onclick=()=>{$('#input').value='';$('#out').innerHTML='';$('#status').textContent=''};
+$('#go').onclick=go;$('#input').addEventListener('keydown',e=>{if(e.key==='Enter'&&(e.metaKey||e.ctrlKey))go()});
+async function go(){
+  const text=$('#input').value.trim();if(!text)return;
+  $('#go').disabled=true;$('#status').textContent='解析中…（会先跟随短链，再提取媒体信息）';$('#out').innerHTML='';
+  try{const r=await fetch('/api/parse',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text})});
+    const d=await r.json();if(d.error)throw new Error(d.error);
+    d.items.forEach(render);$('#status').textContent=`完成，共 ${d.items.length} 条`;
+  }catch(e){$('#status').textContent='';$('#out').innerHTML=`<div class="box item err">${esc(e.message)}</div>`}
+  $('#go').disabled=false;
+}
+function render(it){
+  const el=document.createElement('div');el.className='box item';$('#out').appendChild(el);
+  if(it.error){el.innerHTML=`<div>${esc(it.source)}</div><div class="err">${esc(it.error)}</div>`;return}
+  const r=it.result, wm=WM[r.watermark]||WM.unknown;
+  pushRecent({url:it.source,label:`${r.provider} · ${(r.title||r.author||r.id).slice(0,14)}`});
+  const v=r.files.find(f=>f.kind==='video');
+  el.innerHTML=`<div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><strong>${esc(r.title||'(无标题)')}</strong><span class="tag ${wm[1]}">水印：${wm[0]}</span></div>
+  <div class="meta"><b>平台</b><span>${esc(r.provider)}（${esc(r.extractor)}）</span><b>作者</b><span>${esc(r.author)}</span>
+  ${r.duration?`<b>时长</b><span>${Math.round(r.duration)} 秒</span>`:''}${v&&v.width?`<b>分辨率</b><span>${v.width}×${v.height}</span>`:''}
+  ${r.desc&&r.desc!==r.title?`<b>描述</b><span>${esc(r.desc)}</span>`:''}</div>
+  <div class="row"><button class="primary" data-act="all">下载全部</button><button data-act="sel">下载选中</button><button data-act="zip">打包 ZIP</button>
+  <button data-act="extra">封面 + 背景音频</button><label style="font-size:13px"><input type="checkbox" class="selall"> 全选</label></div>
+  <div class="grid">${r.files.map((f,i)=>cell(f,i)).join('')}</div><div class="saved"></div>`;
+  const saved=el.querySelector('.saved'), sel=()=>[...el.querySelectorAll('.cell input:checked')].map(x=>+x.dataset.i);
+  el.querySelector('.selall').onchange=e=>el.querySelectorAll('.cell input').forEach(x=>x.checked=e.target.checked);
+  const dl=async(body,label)=>{saved.textContent=label+'…';
+    try{const q=await fetch('/api/download',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({source:it.source,...body})});
+      const d=await q.json();if(d.error)throw new Error(d.error);
+      saved.innerHTML='已保存：'+d.files.map(f=>`<a href="${f.href}">${esc(f.name)}</a>`).join('、')+(d.errors&&d.errors.length?`<div class="err">部分失败：${esc(d.errors.join('；'))}</div>`:'');
+    }catch(e){saved.innerHTML=`<span class="err">${esc(e.message)}</span>`}};
+  el.querySelector('[data-act=all]').onclick=()=>dl({},'下载中');
+  el.querySelector('[data-act=zip]').onclick=()=>dl({zip:true},'下载并打包中');
+  el.querySelector('[data-act=extra]').onclick=()=>dl({kinds:['cover','audio']},'下载中');
+  el.querySelector('[data-act=sel]').onclick=async()=>{const s=sel();if(!s.length){saved.textContent='先勾选要下载的文件';return}
+    const links=[];for(const i of s){saved.textContent=`下载中 ${links.length+1}/${s.length}…`;
+      const q=await fetch('/api/download',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({source:it.source,only:i})});
+      const d=await q.json();if(d.error){saved.innerHTML=`<span class="err">${esc(d.error)}</span>`;return}links.push(...d.files)}
+    saved.innerHTML='已保存：'+links.map(f=>`<a href="${f.href}">${esc(f.name)}</a>`).join('、')};
+  el.querySelectorAll('[data-one]').forEach(b=>b.onclick=()=>dl({only:+b.dataset.one},'下载中'));
+}
+function cell(f,i){
+  const src='/api/preview?u='+encodeURIComponent(f.url);
+  const media=(f.kind==='video'||f.kind==='live')?`<video src="${src}" controls preload="metadata" playsinline></video>`
+    :f.kind==='audio'?`<audio src="${src}" controls style="width:100%;margin-top:70px"></audio><div style="height:80px"></div>`
+    :`<img src="${src}" loading="lazy" alt="">`;
+  return `<div class="cell"><input type="checkbox" data-i="${i}">${media}<div class="bar"><span>${KIND[f.kind]||f.kind}${f.backup_urls.length?' · 有备用源':''}</span><button data-one="${i}" style="padding:2px 8px">保存</button></div></div>`;
+}
+</script>
+</body>
+</html>
