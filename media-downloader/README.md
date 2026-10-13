@@ -5,7 +5,7 @@
 
 ## 支持什么
 
-| 平台 | 内容 | 解析方式 | 2026-10-13 本机实测（[详情](docs/实测记录.md)） |
+| 平台 | 内容 | 解析方式 | 2026-10-13 本机实测（[详情](docs/live-test.md)） |
 |---|---|---|---|
 | 抖音 | 视频（无水印 1080p）、图集、Live 动图、封面、背景音乐 | 自研：公开分享页 `_ROUTER_DATA`，`playwm→play`；失败退回 yt-dlp | ✅ |
 | 小红书 | 图文笔记原图（转 PNG）、Live 图、视频笔记 | 自研：笔记页 `__INITIAL_STATE__`，按 token 拼原图 | ✅ |
@@ -68,7 +68,7 @@ export MEDIADL_PROXY_PLATFORMS=tiktok,instagram,twitter,reddit    # 默认就是
 
 ## 怎么来的
 
-用 GitHub 上的 [REA（morluto/rea）](https://github.com/morluto/rea) 静态分析了网站前端，结论是：网站前端只把链接 POST 给自己的 `/api/parse`（带 Cloudflare Turnstile 验证），真正的解析都在它服务端，前端里拿不到。所以本地版没有去调用或模仿它的接口，而是按它的功能清单、链接识别规则和结果字段，用公开页面数据 + 成熟开源项目在本机重新实现。分析过程见 [docs/REA逆向分析.md](docs/REA逆向分析.md)。
+用 GitHub 上的 [REA（morluto/rea）](https://github.com/morluto/rea) 静态分析了网站前端，结论是：网站前端只把链接 POST 给自己的 `/api/parse`（带 Cloudflare Turnstile 验证），真正的解析都在它服务端，前端里拿不到。所以本地版没有去调用或模仿它的接口，而是按它的功能清单、链接识别规则和结果字段，用公开页面数据 + 成熟开源项目在本机重新实现。分析过程见 [docs/rea-analysis.md](docs/rea-analysis.md)。
 
 ## 测试
 

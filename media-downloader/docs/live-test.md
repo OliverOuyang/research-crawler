@@ -27,3 +27,14 @@
 export HTTPS_PROXY=http://127.0.0.1:7890   # 换成你自己的代理端口
 .venv/bin/python -m mediadl serve
 ```
+
+## VPS（2026-10-13，Hostinger 美国机房，未放 cookies）
+
+| 平台 | 结果 | 备注 |
+|---|---|---|
+| TikTok | ✅ | 需要 `curl-cffi`（已写进 requirements），直连和走 7890 代理都能下 |
+| X / Twitter | ✅ | |
+| 抖音 | ✅ 大多数 | 6 次里 5 次成功，已加自动重试 |
+| 小红书 | ❌ 需 cookies | 美国 IP 访问笔记页会被跳到登录页 |
+| Instagram | ❌ 需 cookies | 未登录返回空数据 |
+| 快手 | 已移除 | |

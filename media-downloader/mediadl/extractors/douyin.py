@@ -37,7 +37,8 @@ def extract(url: str) -> MediaResult:
         raise ExtractError(f"没认出抖音作品 ID：{url}")
 
     item = None
-    for kind in ("video", "note"):
+    # 分享页偶发不带作品数据（VPS 上实测约 1/6），换种类型并整体重试一轮
+    for kind in ("video", "note", "video", "note"):
         page = f"https://www.iesdouyin.com/share/{kind}/{aid}/"
         _, html = client.get(page, headers={"Referer": "https://www.douyin.com/"})
         data = find_json_assignment(html, ["_ROUTER_DATA"])
