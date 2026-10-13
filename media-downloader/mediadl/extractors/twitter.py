@@ -19,7 +19,7 @@ def extract(url: str) -> MediaResult:
     if not m:
         raise ExtractError(f"没认出推文 ID：{url}")
     tid = m.group(1)
-    _, body = Client(ua=DESKTOP_UA).get(f"https://api.fxtwitter.com/status/{tid}")
+    _, body = Client("twitter", ua=DESKTOP_UA).get(f"https://api.fxtwitter.com/status/{tid}")
     data = json.loads(body)
     tweet = data.get("tweet")
     if not tweet:

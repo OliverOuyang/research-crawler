@@ -5,7 +5,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from mediadl.extractors import douyin, kuaishou, xiaohongshu  # noqa: E402
+from mediadl.extractors import douyin, xiaohongshu  # noqa: E402
 from mediadl.extractors._util import find_json_assignment  # noqa: E402
 from mediadl.linkparse import detect_provider, extract_urls  # noqa: E402
 
@@ -26,7 +26,7 @@ class LinkParse(unittest.TestCase):
         cases = {
             "https://www.douyin.com/video/7300000000000000000": "douyin",
             "https://www.xiaohongshu.com/explore/6411cf99000000001300b6d9": "xiaohongshu",
-            "https://v.kuaishou.com/abc": "kuaishou",
+            "https://v.kuaishou.com/abc": "kuaishou",  # 能识别，但 core 会提示暂不支持
             "https://www.bilibili.com/video/BV1GJ411x7h7": "bilibili",
             "https://m.weibo.cn/status/123": "weibo",
             "https://vm.tiktok.com/ZM123/": "tiktok",
@@ -123,22 +123,6 @@ class Xiaohongshu(unittest.TestCase):
         self.assertEqual(r.videos[0].url, "https://sns-video-bd.xhscdn.com/pre_post/abc")
         self.assertEqual(r.videos[0].backup_urls, ["https://sns-video-bd.xhscdn.com/s.mp4", "https://b/s.mp4"])
         self.assertEqual([f.kind for f in r.files], ["video", "cover"])
-
-
-class Kuaishou(unittest.TestCase):
-    def test_video(self):
-        state = {"x": {"photo": {"photoId": "3x", "caption": "快手", "userName": "老铁",
-                                  "mainMvUrls": [{"url": "https://txmov2.a.kwimgs.com/a.mp4"}], "duration": 9000,
-                                  "coverUrls": [{"url": "https://p1.a.yximgs.com/c.jpg"}]}}}
-        r = kuaishou.parse_photo(kuaishou._find_photo(state))
-        self.assertEqual(r.videos[0].url, "https://txmov2.a.kwimgs.com/a.mp4")
-        self.assertEqual(r.duration, 9)
-        self.assertEqual([f.kind for f in r.files], ["video", "cover"])
-
-    def test_atlas(self):
-        p = {"photoId": "1", "caption": "", "atlas": {"cdn": ["p2.a.yximgs.com"], "list": ["/a.jpg", "/b.jpg"], "music": "/m.m4a"}}
-        r = kuaishou.parse_photo(p)
-        self.assertEqual([f.url for f in r.images], ["https://p2.a.yximgs.com/a.jpg", "https://p2.a.yximgs.com/b.jpg"])
 
 
 if __name__ == "__main__":

@@ -1,6 +1,6 @@
 # media-downloader：本地版无水印下载器
 
-对标 [dyxhsdownloader.com](https://dyxhsdownloader.com/#supports) 的功能，但解析和下载都在你自己电脑上完成。
+对标 [dyxhsdownloader.com](https://dyxhsdownloader.com/#supports) 的功能（快手除外），但解析和下载都在你自己电脑上完成。
 只用于下载你有权保存的**公开**内容（个人收藏、调研素材）。不绕过登录、付费、验证码或加密；需要登录态的内容，用你自己导出的 cookies。
 
 ## 支持什么
@@ -9,7 +9,6 @@
 |---|---|---|---|
 | 抖音 | 视频（无水印 1080p）、图集、Live 动图、封面、背景音乐 | 自研：公开分享页 `_ROUTER_DATA`，`playwm→play`；失败退回 yt-dlp | ✅ |
 | 小红书 | 图文笔记原图（转 PNG）、Live 图、视频笔记 | 自研：笔记页 `__INITIAL_STATE__`，按 token 拼原图 | ✅ |
-| 快手 | 视频、图集 | 自研：分享页 + 网页版 GraphQL | ⚠️ 未登录会弹滑块验证，需要 `cookies/kuaishou.txt` |
 | X / Twitter | 视频（最高码率）、GIF、单图多图原图 | FixTweet 公开接口 `api.fxtwitter.com`，退回 yt-dlp | ✅ |
 | Reddit | 单图、多图、Reddit 托管视频 | 图片走 `.json`，视频走 yt-dlp（合并音轨） | ✅ 视频 |
 | B站 / 微博 / TikTok / Instagram | 视频 | yt-dlp | B站、微博 ✅；TikTok 要代理；Instagram 要 cookies |
@@ -43,7 +42,7 @@ brew install ffmpeg   # 已装可跳过
 .venv/bin/python -m mediadl "链接1 链接2" --zip                 # 多文件额外打包
 ```
 
-文件存到 `downloads/{平台}/{作者_标题_ID}/`（已被 .gitignore 排除）。
+文件存到 `downloads/{平台}/{作者_标题_ID}/`（已被 .gitignore 排除；可用环境变量 `MEDIADL_OUT` 改位置）。
 
 **在别的 Python 里调用**：
 
@@ -56,7 +55,12 @@ download(r, "./downloads", kinds=("video",))
 
 ## 需要代理时
 
-TikTok、Instagram、X 在国内网络下通常要代理：启动前 `export HTTPS_PROXY=http://127.0.0.1:7890`（换成你的端口），解析和 yt-dlp 都会走它。
+TikTok、Instagram、X、Reddit 可以单独走代理，其它平台照常直连（抖音、小红书走海外代理反而容易失败）：
+
+```bash
+export MEDIADL_PROXY=http://127.0.0.1:7890                        # 你的代理
+export MEDIADL_PROXY_PLATFORMS=tiktok,instagram,twitter,reddit    # 默认就是这几个，可改
+```
 
 ## 需要登录态时
 
@@ -76,5 +80,5 @@ python3 -m unittest discover -s tests     # 离线单测，不联网
 
 - 平台页面结构和风控会变，自研解析失效时先看报错提示，必要时更新解析规则或放 cookies。
 - 小红书 explore 链接必须带 `xsec_token`（App 分享链接和整段文案都带），否则会被导到 404。
-- 快手目前未登录访问都要滑块验证，本工具不会替你过验证码。
+- 快手不做：未登录访问一律要滑块验证，本工具不过验证码（粘快手链接会直接提示不支持）。
 - 部分视频笔记（小红书拿不到 `originVideoKey` 时）只能“尽力去水印”，页面会标注。

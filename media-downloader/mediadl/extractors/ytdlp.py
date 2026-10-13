@@ -4,7 +4,7 @@
 """
 from __future__ import annotations
 
-from ..http import cookie_file
+from ..http import cookie_file, proxy_for
 from ..models import ExtractError, MediaFile, MediaResult
 
 
@@ -13,6 +13,9 @@ def _ydl_opts(provider: str, extra: dict | None = None) -> dict:
     cf = cookie_file(provider)
     if cf:
         opts["cookiefile"] = str(cf)
+    px = proxy_for(provider)
+    if px:
+        opts["proxy"] = px
     opts.update(extra or {})
     return opts
 

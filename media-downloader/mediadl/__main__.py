@@ -28,7 +28,7 @@ def main(argv: list[str] | None = None) -> int:
         serve(a.host, a.port)
         return 0
 
-    ap = argparse.ArgumentParser(prog="mediadl", description="本地解析下载抖音/小红书/快手/B站/微博/TikTok/Instagram/X/Reddit 公开内容")
+    ap = argparse.ArgumentParser(prog="mediadl", description="本地解析下载抖音/小红书/B站/微博/TikTok/Instagram/X/Reddit 公开内容")
     ap.add_argument("text", help="链接或整段分享文案；可以包含多条链接")
     ap.add_argument("--info", action="store_true", help="只解析不下载，输出 JSON")
     ap.add_argument("--kinds", default="video,image,live", help="要下载的类型，逗号分隔：video,image,live,cover,audio")
@@ -38,7 +38,7 @@ def main(argv: list[str] | None = None) -> int:
 
     urls = parse_text(a.text)
     if not urls:
-        print("没找到受支持平台的链接（抖音/小红书/快手/B站/微博/TikTok/Instagram/X/Reddit）", file=sys.stderr)
+        print("没找到受支持平台的链接（抖音/小红书/B站/微博/TikTok/Instagram/X/Reddit）", file=sys.stderr)
         return 2
     code = 0
     for u in urls:

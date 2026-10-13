@@ -20,7 +20,6 @@ _REDDIT_SHORT_RE = re.compile(r"https?://(?:www\.)?redd\.it/[a-z0-9]+(?:[/?#]|$)
 PROVIDERS = {
     "douyin": "抖音",
     "xiaohongshu": "小红书",
-    "kuaishou": "快手",
     "bilibili": "B站",
     "weibo": "微博",
     "tiktok": "TikTok",

@@ -16,7 +16,7 @@ class MediaFile:
 
 @dataclass
 class MediaResult:
-    provider: str  # douyin / xiaohongshu / kuaishou / bilibili / weibo / tiktok / instagram / twitter / reddit
+    provider: str  # douyin / xiaohongshu / bilibili / weibo / tiktok / instagram / twitter / reddit
     id: str
     url: str  # 解析后的落地链接（短链跟随之后）
     title: str = ""

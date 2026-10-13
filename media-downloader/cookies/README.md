@@ -4,7 +4,6 @@
 
 | 文件名 | 什么时候需要 |
 |---|---|
-| `kuaishou.txt` | 快手：未登录访问会弹滑块验证（2026-10 实测必需） |
 | `douyin.txt` | 抖音分享页不返回数据、退到 yt-dlp 时 |
 | `xiaohongshu.txt` | 小红书提示 404/登录页时 |
 | `weibo.txt` / `instagram.txt` / `tiktok.txt` / `bilibili.txt` … | yt-dlp 提示需要登录或 cookies 时 |

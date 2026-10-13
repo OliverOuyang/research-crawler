@@ -22,7 +22,7 @@ OUT = Path(DEFAULT_OUT)
 
 _lock = threading.Lock()
 _results: dict[str, MediaResult] = {}  # 原始链接 -> 解析结果
-_allowed: dict[str, str] = {}  # 媒体地址 -> referer（预览代理白名单）
+_allowed: dict[str, tuple[str, str]] = {}  # 媒体地址 -> (referer, 平台)（预览代理白名单）
 
 
 def _remember(src: str, res: MediaResult) -> None:
@@ -30,7 +30,7 @@ def _remember(src: str, res: MediaResult) -> None:
         _results[src] = res
         for f in res.files:
             for u in [f.url, *f.backup_urls]:
-                _allowed[u] = res.referer or ""
+                _allowed[u] = (res.referer or "", res.provider)
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -81,7 +81,7 @@ class Handler(BaseHTTPRequestHandler):
     def _parse(self, body: dict):
         urls = parse_text(body.get("text", ""))
         if not urls:
-            return self._json({"error": "没找到受支持平台的链接（抖音/小红书/快手/B站/微博/TikTok/Instagram/X/Reddit）"}, 400)
+            return self._json({"error": "没找到受支持平台的链接（抖音/小红书/B站/微博/TikTok/Instagram/X/Reddit）"}, 400)
         out = []
         for src in urls:
             try:
@@ -113,12 +113,13 @@ class Handler(BaseHTTPRequestHandler):
 
     def _preview(self, url: str):
         with _lock:
-            ref = _allowed.get(url)
-        if ref is None:
+            entry = _allowed.get(url)
+        if entry is None:
             return self.send_error(403, "only URLs from a recent parse can be previewed")
-        ua = MOBILE_UA if ("douyin" in ref or "kuaishou" in ref) else DESKTOP_UA
+        ref, provider = entry
+        ua = MOBILE_UA if provider == "douyin" else DESKTOP_UA
         try:
-            with Client(ua=ua).stream(url, headers={"Referer": ref} if ref else None) as r:
+            with Client(provider, ua=ua).stream(url, headers={"Referer": ref} if ref else None) as r:
                 self.send_response(200)
                 self.send_header("Content-Type", r.headers.get("Content-Type") or "application/octet-stream")
                 if r.headers.get("Content-Length"):

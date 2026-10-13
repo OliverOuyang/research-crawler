@@ -23,6 +23,19 @@ DESKTOP_UA = (
 COOKIES_DIR = Path(os.environ.get("MEDIADL_COOKIES_DIR", Path(__file__).resolve().parent.parent / "cookies"))
 
 
+# 代理：只给需要海外出口的平台用，抖音/小红书/B站/微博照常直连。
+#   MEDIADL_PROXY=http://127.0.0.1:7890
+#   MEDIADL_PROXY_PLATFORMS=tiktok,instagram,twitter,reddit   （默认值）
+PROXY = os.environ.get("MEDIADL_PROXY", "").strip()
+PROXY_PLATFORMS = {
+    p.strip() for p in os.environ.get("MEDIADL_PROXY_PLATFORMS", "tiktok,instagram,twitter,reddit").split(",") if p.strip()
+}
+
+
+def proxy_for(provider: str) -> str | None:
+    return PROXY if PROXY and provider in PROXY_PLATFORMS else None
+
+
 def cookie_file(provider: str) -> Path | None:
     p = COOKIES_DIR / f"{provider}.txt"
     return p if p.is_file() else None
@@ -36,7 +49,11 @@ class Client:
         cf = cookie_file(provider) if provider else None
         if cf:
             self.jar.load(str(cf), ignore_discard=True, ignore_expires=True)
-        self.opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(self.jar))
+        handlers: list = [urllib.request.HTTPCookieProcessor(self.jar)]
+        px = proxy_for(provider)
+        if px:
+            handlers.append(urllib.request.ProxyHandler({"http": px, "https": px}))
+        self.opener = urllib.request.build_opener(*handlers)
 
     def _req(self, url: str, headers: dict | None = None, data: bytes | None = None):
         h = {"User-Agent": self.ua, "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8", "Accept-Encoding": "gzip, deflate"}

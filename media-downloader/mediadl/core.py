@@ -1,22 +1,25 @@
 """对外的两个动作：parse（解析链接）和 download（保存到本地，可打包 ZIP）。CLI 和本地网页都调这里。"""
 from __future__ import annotations
 
+import os
 import re
 import zipfile
 from pathlib import Path
 
-from .extractors import douyin, kuaishou, reddit, twitter, xiaohongshu, ytdlp
+from .extractors import douyin, reddit, twitter, xiaohongshu, ytdlp
 from .http import DESKTOP_UA, MOBILE_UA, Client
 from .linkparse import detect_provider, extract_urls
 from .models import ExtractError, MediaFile, MediaResult
 
-DEFAULT_OUT = Path(__file__).resolve().parent.parent / "downloads"
+DEFAULT_OUT = Path(os.environ.get("MEDIADL_OUT") or Path(__file__).resolve().parent.parent / "downloads")
+
+# 识别得出但不做的平台
+UNSUPPORTED = {"kuaishou": "快手暂不支持：未登录访问一律要滑块验证，本工具不做"}
 
 # 每个平台的解析顺序：先自研解析，失败再交给 yt-dlp
 _CHAINS = {
     "douyin": [douyin.extract, "yt-dlp"],
     "xiaohongshu": [xiaohongshu.extract],
-    "kuaishou": [kuaishou.extract],
     "twitter": [twitter.extract, "yt-dlp"],
     "reddit": [reddit.extract, "yt-dlp"],
 }
@@ -26,6 +29,8 @@ def parse(url: str) -> MediaResult:
     provider = detect_provider(url)
     if not provider:
         raise ExtractError(f"不支持的链接：{url}")
+    if provider in UNSUPPORTED:
+        raise ExtractError(UNSUPPORTED[provider])
     errors = []
     for step in _CHAINS.get(provider, ["yt-dlp"]):
         try:
@@ -74,7 +79,7 @@ def download(
             errors.append(str(e))
         kinds = tuple(k for k in kinds if k != "video")
 
-    client = Client(res.provider, ua=MOBILE_UA if res.provider in ("douyin", "kuaishou") else DESKTOP_UA)
+    client = Client(res.provider, ua=MOBILE_UA if res.provider == "douyin" else DESKTOP_UA)
     counters: dict[str, int] = {}
     for f in res.files:
         if f.kind not in kinds:
