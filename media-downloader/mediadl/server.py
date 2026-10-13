@@ -7,7 +7,9 @@ from __future__ import annotations
 
 import json
 import mimetypes
+import os
 import threading
+import time
 import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -19,6 +21,22 @@ from .models import ExtractError, MediaResult
 
 STATIC = Path(__file__).resolve().parent / "static"
 OUT = Path(DEFAULT_OUT)
+# 部署在服务器上时自动清理旧文件（小时）；0 表示不清理。本机默认不清理。
+KEEP_HOURS = float(os.environ.get("MEDIADL_KEEP_HOURS", "0") or 0)
+
+
+def _prune() -> None:
+    if KEEP_HOURS <= 0 or not OUT.exists():
+        return
+    cutoff = time.time() - KEEP_HOURS * 3600
+    for p in sorted(OUT.rglob("*"), key=lambda x: len(x.parts), reverse=True):
+        try:
+            if p.is_file() and p.stat().st_mtime < cutoff:
+                p.unlink()
+            elif p.is_dir() and not any(p.iterdir()):
+                p.rmdir()
+        except OSError:
+            pass
 
 _lock = threading.Lock()
 _results: dict[str, MediaResult] = {}  # 原始链接 -> 解析结果
@@ -93,6 +111,7 @@ class Handler(BaseHTTPRequestHandler):
         return self._json({"items": out})
 
     def _download(self, body: dict):
+        _prune()
         src = body.get("source", "")
         with _lock:
             res = _results.get(src)
