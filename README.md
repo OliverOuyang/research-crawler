@@ -22,5 +22,9 @@ python scripts/tavily_search.py "关键词" --depth basic --max 8 --domain reddi
 
 搜索结果按日期存到 `data/raw/tavily/`（已被 .gitignore 排除）。
 
+## 本地无水印下载器（media-downloader/）
+
+对标 dyxhsdownloader.com 的本地版：抖音、小红书、快手、B站、微博、TikTok、Instagram、X、Reddit 的公开视频和图集，带本地网页和命令行。见 [media-downloader/README.md](media-downloader/README.md)。
+
 ## 密钥
 所有 key 只放在 `.env` 或云环境的网络密钥里，`.gitignore` 已排除 `.env`、`*.key`、`*secret*`、`*credential*`。不要把 key 写进代码、文档或提交信息。
